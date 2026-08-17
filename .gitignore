@@ -32,3 +32,9 @@ ios/App/Pods/
 ios/App/.build/
 ios/App/xcuserdata/
 ios/App/DerivedData/
+.venv/
+node_modules/
+__pycache__/
+*.pyc
+.env
+
