@@ -1,6 +1,54 @@
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 
+function drawEdgeDimensions(room, ppm) {
+  if (room.isPolygon) return;
+
+  const lengthM = (room.width / ppm).toFixed(2);
+  const widthM = (room.height / ppm).toFixed(2);
+  const offset = 18 / zoom;
+  const arrow = 5 / zoom;
+  const color = '#1e293b';
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 1.2 / zoom;
+  ctx.setLineDash([]);
+  ctx.font = `bold ${10 / zoom}px Arial`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  const topY = room.y - offset;
+  ctx.beginPath();
+  ctx.moveTo(room.x, topY); ctx.lineTo(room.x + room.width, topY);
+  ctx.moveTo(room.x, topY - arrow); ctx.lineTo(room.x, topY + arrow);
+  ctx.moveTo(room.x + room.width, topY - arrow); ctx.lineTo(room.x + room.width, topY + arrow);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(room.x, topY); ctx.lineTo(room.x + arrow, topY - arrow / 2); ctx.lineTo(room.x + arrow, topY + arrow / 2);
+  ctx.moveTo(room.x + room.width, topY); ctx.lineTo(room.x + room.width - arrow, topY - arrow / 2); ctx.lineTo(room.x + room.width - arrow, topY + arrow / 2);
+  ctx.fill();
+  ctx.fillText(`${lengthM} m`, room.x + room.width / 2, topY - 3 / zoom);
+
+  const rightX = room.x + room.width + offset;
+  ctx.beginPath();
+  ctx.moveTo(rightX, room.y); ctx.lineTo(rightX, room.y + room.height);
+  ctx.moveTo(rightX - arrow, room.y); ctx.lineTo(rightX + arrow, room.y);
+  ctx.moveTo(rightX - arrow, room.y + room.height); ctx.lineTo(rightX + arrow, room.y + room.height);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(rightX, room.y); ctx.lineTo(rightX - arrow / 2, room.y + arrow); ctx.lineTo(rightX + arrow / 2, room.y + arrow);
+  ctx.moveTo(rightX, room.y + room.height); ctx.lineTo(rightX - arrow / 2, room.y + room.height - arrow); ctx.lineTo(rightX + arrow / 2, room.y + room.height - arrow);
+  ctx.fill();
+  ctx.save();
+  ctx.translate(rightX + 4 / zoom, room.y + room.height / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.fillText(`${widthM} m`, 0, 0);
+  ctx.restore();
+  ctx.restore();
+}
+
 // Resize canvas to fill container
 function resizeCanvas() {
   const container = canvas.parentElement;
@@ -196,6 +244,7 @@ canvas.addEventListener('mouseup', (e) => {
         width: width,
         height: height,
         orientation: 'auto',
+        roomType: document.getElementById('roomType').value,
         color: getRandomColor(),
         doors: []
       };
@@ -294,6 +343,7 @@ function draw() {
 
   // Draw rooms
   rooms.forEach(room => {
+    const roomType = room.roomType || 'carpet';
     // ── Carpet orientation + strips + joints — all clipped to room ──────────
     const rollWidthVal = parseFloat(document.getElementById('rollWidth').value) || 4;
     const rollWidthPx  = rollWidthVal * ppm;
@@ -307,8 +357,22 @@ function draw() {
     const jointColor    = '#c0392b';
 
     // ── Step 1: base room fill ────────────────────────────────────────────────
-    ctx.fillStyle = room.color + (room === selectedRoom ? 'AA' : '66');
+    const typeColor = roomType === 'wet' ? '#0f766e' : roomType === 'window' ? '#64748b' : roomType === 'entry' ? '#d97706' : room.color;
+    ctx.fillStyle = typeColor + (room === selectedRoom ? 'AA' : '66');
     ctx.fillRect(room.x, room.y, room.width, room.height);
+
+    if (roomType === 'wet' || roomType === 'window') {
+      ctx.save();
+      ctx.strokeStyle = typeColor;
+      ctx.lineWidth = 2 / zoom;
+      ctx.setLineDash(roomType === 'window' ? [8 / zoom, 5 / zoom] : [4 / zoom, 4 / zoom]);
+      ctx.strokeRect(room.x, room.y, room.width, room.height);
+      ctx.restore();
+      ctx.fillStyle = '#ffffff';
+      ctx.font = `${Math.max(10, 13 / zoom)}px sans-serif`;
+      ctx.fillText(roomType === 'wet' ? 'WET AREA' : 'WINDOW', room.x + 6, room.y + 18);
+      return;
+    }
 
     ctx.save();
     ctx.beginPath();
@@ -596,6 +660,8 @@ function draw() {
         }
       }
     });
+
+    drawEdgeDimensions(room, ppm);
     
     // Labels
     ctx.fillStyle = '#2c3e50';
@@ -608,7 +674,6 @@ function draw() {
 
     ctx.fillText(room.name, room.x + room.width/2, room.y + room.height/2 - 14/zoom);
     ctx.font = `${11 / zoom}px Arial`;
-    ctx.fillText(`${lengthM}m × ${widthM}m`, room.x + room.width/2, room.y + room.height/2 + 2/zoom);
     // Direction label
     ctx.font = `bold ${10 / zoom}px Arial`;
     ctx.fillStyle = 'rgba(44,62,80,0.75)';

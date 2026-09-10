@@ -361,7 +361,7 @@ function calculate() {
   rooms.forEach(r => { r.offcutInfo = null; r.isOffcutDonor = null; });
 
   // Build metre rooms array first so we can run optimisation pre-scan
-  const metreRooms = rooms.map(room => ({
+  const metreRooms = rooms.filter(room => !['wet', 'window'].includes(room.roomType)).map(room => ({
     name:        room.name,
     length:      room.width  / ppm,
     width:       room.height / ppm,

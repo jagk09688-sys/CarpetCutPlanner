@@ -614,12 +614,13 @@ function calculate() {
   const pricePerSqm  = parseFloat(document.getElementById('pricePerSqm').value)  || 0;
   const fittingCost  = parseFloat(document.getElementById('fittingCost').value)  || 0;
   const pricePerLinM = pricePerSqm * rollWidth;
+  const excludedRooms = rooms.filter(room => ['wet', 'window'].includes(room.roomType));
 
   // Clear any previous offcut link annotations so the canvas starts fresh
   rooms.forEach(r => { r.offcutInfo = null; r.isOffcutDonor = null; });
 
   // Build metre rooms array first so we can run optimisation pre-scan
-  const metreRooms = rooms.map(room => ({
+  const metreRooms = rooms.filter(room => !['wet', 'window'].includes(room.roomType)).map(room => ({
     name:        room.name,
     length:      room._ocrLength || room.width  / ppm,
     width:       room._ocrWidth  || room.height / ppm,
@@ -629,7 +630,7 @@ function calculate() {
   }));
 
   // Debug log for OCR-imported rooms
-  rooms.forEach((room, idx) => {
+  rooms.filter(room => !['wet', 'window'].includes(room.roomType)).forEach((room, idx) => {
     if (room._ocrLength || room._ocrWidth) {
       const mr = metreRooms[idx];
       console.log(`[CALC ROOM ${idx} "${room.name}"] Using OCR: length=${mr.length.toFixed(2)}m width=${mr.width.toFixed(2)}m`);
@@ -841,6 +842,10 @@ function calculate() {
   }
 
   summaryHtml += `</div>`;
+
+  if (excludedRooms.length > 0) {
+    summaryHtml += `<div class="info-strip info-teal"><strong>Excluded from carpet:</strong> ${excludedRooms.map(room => `${room.name} (${getRoomTypeLabel(room.roomType)})`).join(', ')}. These areas remain on the floor plan for reference.</div>`;
+  }
 
   let offcutNote = '';
   if (offcuts.length) {

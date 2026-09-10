@@ -76,6 +76,11 @@ function getRandomColor() {
   return colors[Math.floor(Math.random() * colors.length)];
 }
 
+function setNewAreaType(roomType) {
+  const selector = document.getElementById('roomType');
+  if (selector) selector.value = roomType;
+}
+
 // Room management
 function updateRoomsList() {
   const list = document.getElementById('roomsList');
@@ -125,6 +130,12 @@ function updateRoomsList() {
              onchange="renameRoom(${room.id}, this.value)"
              onclick="event.stopPropagation()">
       ${combinedBadge}
+      <select onchange="setRoomType(${room.id}, this.value)" onclick="event.stopPropagation()">
+        <option value="carpet" ${(!room.roomType || room.roomType === 'carpet') ? 'selected' : ''}>Carpeted Room</option>
+        <option value="entry" ${room.roomType === 'entry' ? 'selected' : ''}>Entry / Hallway</option>
+        <option value="wet" ${room.roomType === 'wet' ? 'selected' : ''}>Wet Area / Hard Floor</option>
+        <option value="window" ${room.roomType === 'window' ? 'selected' : ''}>Window / Opening</option>
+      </select>
       <div class="room-dims">
         📏
         <label style="color:#ecf0f1;font-size:0.85em;">L:</label>
@@ -184,6 +195,7 @@ function addRoomByDimension() {
   document.getElementById('armName').value   = `Room ${roomCounter}`;
   document.getElementById('armLength').value = '';
   document.getElementById('armWidth').value  = '';
+  document.getElementById('armType').value = document.getElementById('roomType').value;
   document.getElementById('armError').style.display = 'none';
 
   const modal = document.getElementById('addRoomModal');
@@ -205,6 +217,7 @@ function confirmAddRoom() {
   const name    = document.getElementById('armName').value.trim() || `Room ${roomCounter}`;
   const lengthM = parseFloat(document.getElementById('armLength').value);
   const widthM  = parseFloat(document.getElementById('armWidth').value);
+  const roomType = document.getElementById('armType').value;
 
   const errEl = document.getElementById('armError');
   if (isNaN(lengthM) || lengthM <= 0 || isNaN(widthM) || widthM <= 0) {
@@ -238,6 +251,7 @@ function confirmAddRoom() {
     width:       lengthM * ppm,
     height:      widthM  * ppm,
     orientation: 'auto',
+    roomType:    roomType,
     color:       getRandomColor(),
     doors:       []
   };
@@ -248,6 +262,15 @@ function confirmAddRoom() {
   updateRoomsList();
   draw();
   closeAddRoomModal();
+}
+
+function setRoomType(id, roomType) {
+  const room = rooms.find(r => r.id === id);
+  if (!room) return;
+  room.roomType = roomType;
+  updateRoomsList();
+  draw();
+  if (document.getElementById('results').innerHTML.trim() !== '') calculate();
 }
 
 function renameRoom(id, name) {

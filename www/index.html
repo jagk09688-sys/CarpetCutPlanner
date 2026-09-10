@@ -57,6 +57,25 @@
       </div>
 
       <div class="section">
+        <h3>Area Type</h3>
+        <div class="input-row">
+          <label for="roomType">New area:</label>
+          <select id="roomType">
+            <option value="carpet">Carpeted Room</option>
+            <option value="entry">Entry / Hallway</option>
+            <option value="wet">Wet Area / Hard Floor</option>
+            <option value="window">Window / Opening</option>
+          </select>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px;">
+          <button class="btn" type="button" onclick="setNewAreaType('entry')">🚪 Entry</button>
+          <button class="btn" type="button" onclick="setNewAreaType('window')">🪟 Window</button>
+          <button class="btn" type="button" onclick="setNewAreaType('wet')">💧 Wet Area</button>
+          <button class="btn" type="button" onclick="setNewAreaType('carpet')">▣ Room</button>
+        </div>
+      </div>
+
+      <div class="section">
         <h3>Door Settings</h3>
         <div class="input-row">
           <label>Door Width (m):</label>
@@ -217,6 +236,15 @@
             <label for="armWidth">Width (m)</label>
             <input type="number" id="armWidth" step="0.01" min="0.1" placeholder="e.g. 3.20">
           </div>
+        </div>
+        <div class="arm-field">
+          <label for="armType">Area Type</label>
+          <select id="armType">
+            <option value="carpet">Carpeted Room</option>
+            <option value="entry">Entry / Hallway</option>
+            <option value="wet">Wet Area / Hard Floor</option>
+            <option value="window">Window / Opening</option>
+          </select>
         </div>
         <div id="armError" class="arm-error" style="display:none;"></div>
       </div>
