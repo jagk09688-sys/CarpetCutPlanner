@@ -37,8 +37,9 @@
       <div class="section">
         <h3>Drawing Mode</h3>
         <button class="btn active" id="btnDraw" onclick="setMode('draw')">
-          📐 Draw Room
+          Draw Room
         </button>
+
         <button class="btn" id="btnSelect" onclick="setMode('select')">
           ↖️ Select/Move
         </button>
@@ -73,6 +74,7 @@
           <button class="btn" type="button" onclick="setNewAreaType('wet')">💧 Wet Area</button>
           <button class="btn" type="button" onclick="setNewAreaType('carpet')">▣ Room</button>
         </div>
+        <div class="area-type-help">Wet areas are shown in teal, measured separately in m², and excluded from carpet quantities.</div>
       </div>
 
       <div class="section">
@@ -142,6 +144,8 @@
           <input type="file" id="bgImageInput" accept="image/*,.pdf" style="display:none"
                  onchange="loadBgImage(this)">
         </label>
+        <button class="btn" style="margin-left:8px;background:#106eea;" onclick="autoImportRooms()">⤴️ Auto Import Rooms</button>
+        <div id="bgStatus" style="color:#d1d5db;font-size:0.82rem;margin-top:8px;min-height:18px;"></div>
         <div class="input-row" style="margin-top:6px;">
           <label>Opacity:</label>
           <input type="range" id="bgOpacity" min="10" max="90" value="35"
@@ -255,6 +259,38 @@
     </div>
   </div>
 
+  <!-- Edit Door Modal -->
+  <div id="editDoorModal" class="modal" style="display:none;">
+    <div class="modal-content add-room-modal-content">
+      <div class="arm-header">
+        <span class="arm-icon">🚪</span>
+        <h3>Edit Door</h3>
+      </div>
+      <div class="arm-body">
+        <div class="arm-field">
+          <label for="edDoorType">Door Type</label>
+          <select id="edDoorType">
+            <option value="single">Single Door</option>
+            <option value="double">Double Door</option>
+            <option value="sliding">Sliding Door</option>
+          </select>
+        </div>
+        <div class="arm-field">
+          <label for="edDoorWidth">Door Width (m)</label>
+          <input type="number" id="edDoorWidth" step="0.1" min="0.5" placeholder="e.g. 0.9">
+        </div>
+        <div class="arm-field">
+          <label style="color:#999;font-size:0.9em;">Side: <span id="edDoorSide">—</span></label>
+        </div>
+      </div>
+      <div class="arm-footer">
+        <button class="arm-btn-cancel" onclick="closeEditDoorModal()">Cancel</button>
+        <button style="background:#e74c3c;color:#fff;border:none;padding:8px 16px;border-radius:6px;cursor:pointer;flex:1;margin:0 6px;" onclick="removeEditingDoor()">🗑️ Remove Door</button>
+        <button class="arm-btn-add" onclick="confirmEditDoor()">✓ Save</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Load Plan Modal -->
   <div id="loadModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.6);
        display:none;align-items:center;justify-content:center;">
@@ -294,6 +330,12 @@
   <script src="js/carpet-calculator.js"></script>
   <script src="js/canvas.js"></script>
   <script src="js/storage.js"></script>
+  <!-- OpenCV and Tesseract for floorplan extraction -->
+  <script src="https://docs.opencv.org/4.x/opencv.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2/dist/tesseract.min.js"></script>
+  <!-- PDF.js for rendering PDF pages to canvas -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+  <script src="js/floorplan-extract.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {

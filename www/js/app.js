@@ -17,6 +17,8 @@ let lastPanX, lastPanY;
 let roomCounter = 1;
 let currentPlanId = null;
 let bgImage = null;
+let editingDoor = null;
+let editingRoom = null;
 
 // Set drawing mode
 function setMode(m) {
@@ -49,6 +51,8 @@ function setMode(m) {
 function updateInfo() {
   const info = document.getElementById('info');
   const panStatus = document.getElementById('panStatus');
+
+  if (!info || !panStatus) return;
   
   panStatus.textContent = panMode ? 'Pan On' : 'Pan Off';
   
@@ -108,6 +112,7 @@ function updateRoomsList() {
         doorsHTML += `
           <div class="door-item">
             <span>${door.type} (${doorWidthM}m) - ${door.side}</span>
+            <button onclick="editDoor(${room.id}, ${door.id}); event.stopPropagation();" style="background:#0f766e;color:#fff;padding:4px 8px;border:none;border-radius:3px;cursor:pointer;font-size:0.8em;margin-right:4px;">✎</button>
             <button onclick="deleteDoor(${room.id}, ${door.id}); event.stopPropagation();">×</button>
           </div>
         `;
@@ -330,6 +335,66 @@ function deleteDoor(roomId, doorId) {
   }
 }
 
+// Edit door functions
+function editDoor(roomId, doorId) {
+  const room = rooms.find(r => r.id === roomId);
+  if (!room) return;
+  
+  const door = room.doors.find(d => d.id === doorId);
+  if (!door) return;
+  
+  editingDoor = door;
+  editingRoom = room;
+  
+  const ppm = getPxPerMeter();
+  const doorWidthM = (door.width / ppm).toFixed(2);
+  
+  document.getElementById('edDoorType').value = door.type;
+  document.getElementById('edDoorWidth').value = doorWidthM;
+  document.getElementById('edDoorSide').textContent = door.side.charAt(0).toUpperCase() + door.side.slice(1);
+  
+  const modal = document.getElementById('editDoorModal');
+  modal.style.display = 'flex';
+}
+
+function closeEditDoorModal() {
+  document.getElementById('editDoorModal').style.display = 'none';
+  editingDoor = null;
+  editingRoom = null;
+}
+
+function confirmEditDoor() {
+  if (!editingDoor || !editingRoom) return;
+  
+  const doorType = document.getElementById('edDoorType').value;
+  const doorWidthM = parseFloat(document.getElementById('edDoorWidth').value);
+  const ppm = getPxPerMeter();
+  
+  if (isNaN(doorWidthM) || doorWidthM <= 0) {
+    alert('Please enter a valid door width.');
+    return;
+  }
+  
+  editingDoor.type = doorType;
+  editingDoor.width = doorWidthM * ppm;
+  
+  closeEditDoorModal();
+  updateRoomsList();
+  draw();
+}
+
+function removeEditingDoor() {
+  if (!editingDoor || !editingRoom) return;
+  
+  if (confirm('Remove this door?')) {
+    editingRoom.doors = editingRoom.doors.filter(d => d.id !== editingDoor.id);
+    doors = doors.filter(d => d.id !== editingDoor.id);
+    closeEditDoorModal();
+    updateRoomsList();
+    draw();
+  }
+}
+
 // Door functions
 function addDoorAtPosition(x, y) {
   for (let room of rooms) {
@@ -500,14 +565,62 @@ function clearAll() {
   }
 }
 
+function ensurePdfJsWorkerPath() {
+  if (typeof pdfjsLib !== 'undefined' && pdfjsLib && pdfjsLib.GlobalWorkerOptions) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+    console.log('PDF.js worker configured:', pdfjsLib.GlobalWorkerOptions.workerSrc);
+  }
+}
+
 // Background image
+function updateBgStatus(message, isError = false) {
+  const statusEl = document.getElementById('bgStatus');
+  if (!statusEl) return;
+  statusEl.textContent = message;
+  statusEl.style.color = isError ? '#ef4444' : '#d1d5db';
+}
+
 function loadBgImage(input) {
   const file = input.files[0];
   if (!file) return;
+  updateBgStatus('Loading file...');
+  // If PDF, render first page to canvas using PDF.js then convert to image
+  if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+    if (typeof pdfjsLib === 'undefined') {
+      updateBgStatus('PDF.js is not available. Refresh the page.', true);
+      console.error('PDF.js library not loaded: pdfjsLib is undefined');
+      return;
+    }
+    ensurePdfJsWorkerPath();
+    renderPdfPageToBlob(file).then(blob => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        bgImage = img;
+        draw();
+        URL.revokeObjectURL(url);
+        updateBgStatus('PDF loaded successfully.');
+      };
+      img.onerror = (e) => {
+        console.error('Failed to load rendered PDF image', e);
+        URL.revokeObjectURL(url);
+        updateBgStatus('Failed to render PDF page as image.', true);
+        alert('Failed to render PDF page as image.');
+      };
+      img.src = url;
+    }).catch(err => {
+      console.error('PDF render failed', err);
+      updateBgStatus('Failed to load PDF. See console for details.', true);
+      alert('Failed to load PDF. Make sure PDF.js is included and the file is valid.');
+    });
+    return;
+  }
+
   const reader = new FileReader();
   reader.onload = e => {
     const img = new Image();
-    img.onload = () => { bgImage = img; draw(); };
+    img.onload = () => { bgImage = img; draw(); updateBgStatus('Image loaded successfully.'); };
+    img.onerror = err => { console.error('Image load failed', err); updateBgStatus('Failed to load image.', true); };
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
@@ -516,7 +629,78 @@ function loadBgImage(input) {
 function clearBgImage() {
   bgImage = null;
   document.getElementById('bgImageInput').value = '';
+  updateBgStatus('Background removed.');
   draw();
+}
+
+// Render first page of a PDF file to a PNG Blob using PDF.js
+function renderPdfPageToBlob(file) {
+  return new Promise((resolve, reject) => {
+    try {
+      const url = URL.createObjectURL(file);
+      const loadingTask = pdfjsLib.getDocument(url);
+      loadingTask.promise.then(pdf => {
+        return pdf.getPage(1);
+      }).then(page => {
+        // Choose a scale so the rendered width matches canvas display width
+        const canvasEl = document.getElementById('canvas');
+        const containerW = (canvasEl && canvasEl.clientWidth) ? canvasEl.clientWidth : 1200;
+        const viewport = page.getViewport({ scale: 1 });
+        const scale = Math.max(1, containerW / viewport.width);
+        const vp = page.getViewport({ scale });
+        const canvas = document.createElement('canvas');
+        canvas.width = vp.width;
+        canvas.height = vp.height;
+        const ctx = canvas.getContext('2d');
+        const renderTask = page.render({ canvasContext: ctx, viewport: vp });
+        renderTask.promise.then(() => {
+          canvas.toBlob(blob => {
+            URL.revokeObjectURL(url);
+            if (!blob) return reject(new Error('Failed to convert canvas to blob'));
+            resolve(blob);
+          }, 'image/png');
+        }).catch(err => { URL.revokeObjectURL(url); reject(err); });
+      }).catch(err => { URL.revokeObjectURL(url); reject(err); });
+    } catch (err) { reject(err); }
+  });
+}
+
+// Auto import rooms from selected background image using OpenCV/Tesseract
+async function autoImportRooms() {
+  const input = document.getElementById('bgImageInput');
+  const file = input.files[0];
+  if (!file) { alert('Please select a background image first (Upload Image).'); return; }
+
+  try {
+    // show brief progress
+    const orig = document.getElementById('info');
+    const old = orig.textContent;
+    orig.textContent = 'Detecting rooms — please wait...';
+    let res;
+    if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+      if (typeof pdfjsLib === 'undefined') {
+        alert('PDF.js is not available. Please refresh the page or check your network connection.');
+        console.error('PDF.js library not loaded: pdfjsLib is undefined');
+        orig.textContent = old;
+        return;
+      }
+      ensurePdfJsWorkerPath();
+      // render first page to image blob then pass as File to importer
+      const blob = await renderPdfPageToBlob(file);
+      const imgFile = new File([blob], 'page1.png', { type: 'image/png' });
+      res = await window.importDetectedRooms(imgFile, { assignNames: true });
+    } else {
+      res = await window.importDetectedRooms(file, { assignNames: true });
+    }
+    orig.textContent = `Imported ${res.created.length} rooms.`; 
+    updateRoomsList(); draw();
+    console.log('Auto-import result:', res);
+    setTimeout(()=> orig.textContent = old, 3000);
+    alert(`Imported ${res.created.length} rooms. Check the right panel to adjust names/dimensions.`);
+  } catch (err) {
+    console.error(err);
+    alert('Auto import failed: ' + err.message);
+  }
 }
 
 // Initialize
@@ -534,4 +718,8 @@ function switchMobileTab(tab) {
   overlay.classList.toggle('mob-open', tab === 'tools' || tab === 'rooms');
 
   tabs.forEach(btn => btn.classList.toggle('active', btn.dataset.tab === tab));
+}
+
+if (typeof module !== 'undefined') {
+  module.exports = { getRandomColor };
 }

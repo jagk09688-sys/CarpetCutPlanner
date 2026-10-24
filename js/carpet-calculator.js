@@ -23,6 +23,33 @@ function getRoomAreaM2(room, ppm) {
   return 0;
 }
 
+function getPlanRoomAreaM2(room, ppm) {
+  if (!room) return 0;
+  if (typeof room.areaM2 === 'number' && room.areaM2 > 0) return room.areaM2;
+  if (room.isPolygon) return getRoomAreaM2(room, ppm);
+
+  const ocrLength = Number(room._ocrLength);
+  const ocrWidth = Number(room._ocrWidth);
+  if (ocrLength > 0 && ocrWidth > 0) return ocrLength * ocrWidth;
+
+  const pixelsPerMeter = typeof ppm === 'number' && ppm > 0 ? ppm : 1;
+  if (room.width > 0 && room.height > 0) {
+    return (room.width * room.height) / (pixelsPerMeter * pixelsPerMeter);
+  }
+
+  return getRoomAreaM2(room, pixelsPerMeter);
+}
+
+function getRoomTypeLabel(type) {
+  const labels = {
+    carpet: 'Carpeted Room',
+    entry: 'Entry / Hallway',
+    wet: 'Wet Area / Hard Floor',
+    window: 'Window / Opening',
+  };
+  return labels[type] || labels.carpet;
+}
+
 function roundUp(val, step) {
   if (!step || step <= 0) return val;
   return Math.ceil(val / step) * step;
@@ -615,6 +642,9 @@ function calculate() {
   const fittingCost  = parseFloat(document.getElementById('fittingCost').value)  || 0;
   const pricePerLinM = pricePerSqm * rollWidth;
   const excludedRooms = rooms.filter(room => ['wet', 'window'].includes(room.roomType));
+  const wetAreaTotal = rooms
+    .filter(room => room.roomType === 'wet')
+    .reduce((total, room) => total + getPlanRoomAreaM2(room, ppm), 0);
 
   // Clear any previous offcut link annotations so the canvas starts fresh
   rooms.forEach(r => { r.offcutInfo = null; r.isOffcutDonor = null; });
@@ -823,6 +853,7 @@ function calculate() {
     <div class="summary-bar">
       <div class="sum-stat"><div class="lbl">Total Roll Length</div><div class="val">${fmt(totalLen)} m</div></div>
       <div class="sum-stat"><div class="lbl">Total Floor Area</div><div class="val">${fmt(totalRoomArea)} m&sup2;</div></div>
+      ${wetAreaTotal > 0 ? `<div class="sum-stat wet-area-stat"><div class="lbl">Wet Area (not carpeted)</div><div class="val">${fmt(wetAreaTotal)} m&sup2;</div></div>` : ''}
       <div class="sum-stat"><div class="lbl">Carpet Area Bought</div><div class="val">${fmt(totalCarpetArea)} m&sup2;</div></div>
       <div class="sum-stat"><div class="lbl">Total Joints</div><div class="val">${totalJoints}</div></div>`;
 
@@ -844,7 +875,7 @@ function calculate() {
   summaryHtml += `</div>`;
 
   if (excludedRooms.length > 0) {
-    summaryHtml += `<div class="info-strip info-teal"><strong>Excluded from carpet:</strong> ${excludedRooms.map(room => `${room.name} (${getRoomTypeLabel(room.roomType)})`).join(', ')}. These areas remain on the floor plan for reference.</div>`;
+    summaryHtml += `<div class="info-strip info-teal"><strong>Excluded from carpet:</strong> ${excludedRooms.map(room => `${room.name} (${getRoomTypeLabel(room.roomType)}, ${fmt(getPlanRoomAreaM2(room, ppm))} m&sup2;)`).join(', ')}. Wet-area measurements are shown for separate hard-floor planning; these areas are not included in carpet quantities or cost.</div>`;
   }
 
   let offcutNote = '';
@@ -977,5 +1008,5 @@ function combineRooms(roomId1, roomId2) {
 }
 
 if (typeof module !== 'undefined') {
-  module.exports = { roundUp, getRoomOrientInfo, calcRoom, calcCrossCut, findOptimisations };
+  module.exports = { roundUp, getRoomOrientInfo, calcRoom, calcCrossCut, findOptimisations, getPlanRoomAreaM2, getRoomTypeLabel };
 }

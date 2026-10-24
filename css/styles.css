@@ -305,6 +305,13 @@ body {
   letter-spacing: 0.07em;
 }
 
+.area-type-help {
+  margin-top: 6px;
+  color: #b6c7dd;
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
 .btn {
   width: 100%;
   padding: 10px 12px;
@@ -1087,6 +1094,14 @@ body {
 .saving-stat { background: #16a34a !important; border-radius: 6px; padding: 4px 8px; }
 .saving-stat .lbl { color: #bbf7d0 !important; }
 .saving-stat .val { color: #fff !important; }
+
+.wet-area-stat {
+  padding: 4px 8px;
+  border: 1px solid #5eead4;
+  border-radius: 6px;
+}
+
+.wet-area-stat .lbl { color: #99f6e4; }
 
 /* ── Summary bar ────────────────────────────────────────────────── */
 .summary-bar {

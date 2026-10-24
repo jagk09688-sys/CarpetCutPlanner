@@ -1,4 +1,15 @@
-const { roundUp, getRoomOrientInfo, calcRoom, findOptimisations } = require('../js/carpet-calculator.js');
+const { roundUp, getRoomOrientInfo, calcRoom, findOptimisations, getPlanRoomAreaM2, getRoomTypeLabel } = require('../js/carpet-calculator.js');
+
+describe('wet-area helpers', () => {
+  test('measures a rectangular plan area in square metres', () => {
+    expect(getPlanRoomAreaM2({ width: 200, height: 120 }, 40)).toBe(15);
+  });
+
+  test('uses imported polygon area and recognizes wet-area label', () => {
+    expect(getPlanRoomAreaM2({ isPolygon: true, areaM2: 6.25 }, 40)).toBe(6.25);
+    expect(getRoomTypeLabel('wet')).toBe('Wet Area / Hard Floor');
+  });
+});
 
 describe('roundUp', () => {
   test('rounds up to step', () => {
