@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Multi-Room Carpet Calculator</title>
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #e5e7eb; padding: 24px; }
+    .wrap { max-width: 900px; margin: auto; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8; }
+    input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e5e7eb; }
+    .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 12px; align-items: end; margin-bottom: 12px; }
+    .btns { display: flex; gap: 10px; margin-top: 10px; }
+    button { background: #38bdf8; color: #001226; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    button.secondary { background: transparent; color: #38bdf8; border: 1px solid #38bdf8; }
+    .result { margin-top: 10px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; border-bottom: 1px solid #1f2937; font-size: 14px; text-align: left; }
+    th { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Multi-Room Carpet Calculator</h1>
+    <div class="card">
+      <label>Roll Width (m)</label>
+      <input type="number" id="rollWidth" step="0.01" value="3.66" />
+    </div>
+
+    <div class="card" id="roomContainer"></div>
+
+    <div class="btns">
+      <button onclick="addRoom()">Add Room</button>
+      <button onclick="calculate()">Calculate</button>
+    </div>
+
+    <div id="output" class="card"></div>
+  </div>
+
+  <script>
+    let roomCount = 0;
+
+    function addRoom(length = '', width = '') {
+      roomCount++;
+      const container = document.getElementById('roomContainer');
+      container.insertAdjacentHTML('beforeend', `
+        <div class="row" id="room${roomCount}">
+          <div><strong>Room ${roomCount}</strong></div>
+          <div>
+            <label>Length (m)</label>
+            <input type="number" step="0.01" value="${length}" id="l${roomCount}" />
+          </div>
+          <div>
+            <label>Width (m)</label>
+            <input type="number" step="0.01" value="${width}" id="w${roomCount}" />
+          </div>
+          <div>
+            <button class="secondary" onclick="removeRoom(${roomCount})">Remove</button>
+          </div>
+        </div>
+      `);
+    }
+
+    function removeRoom(id) {
+      const room = document.getElementById(`room${id}`);
+      if (room) room.remove();
+    }
+
+    function calculate() {
+      const rollW = parseFloat(document.getElementById('rollWidth').value || '3.66');
+      const jointStripLength = 0.7;
+      const jointCount = 3;
+      let totalCarpet = 0;
+      let html = "";
+
+      for (let i = 1; i <= roomCount; i++) {
+        const l = document.getElementById(`l${i}`);
+        const w = document.getElementById(`w${i}`);
+        if (!l || !w) continue;
+
+        const L = parseFloat(l.value);
+        const W = parseFloat(w.value);
+        const uncovered = W - rollW;
+        const jointWidth = uncovered / jointCount;
+        const jointTotal = jointCount * jointStripLength;
+        const roomTotal = L + jointTotal;
+        const roomWithWaste = roomTotal * 1.10;
+
+        totalCarpet += roomWithWaste;
+
+        html += `
+          <div class="result">
+            <strong>Room ${i}</strong><br>
+            Main strip: 1 × ${L.toFixed(2)} m × ${rollW.toFixed(2)} m<br>
+            Remaining width: ${uncovered.toFixed(2)} m<br>
+            Joint strategy: ${jointCount} strips × ${jointWidth.toFixed(2)} m width × ${jointStripLength.toFixed(2)} m length<br>
+            Carpet before waste: ${roomTotal.toFixed(2)} m<br>
+            <strong>Carpet with 10% waste: ${roomWithWaste.toFixed(2)} m</strong>
+          </div>
+        `;
+      }
+
+      html += `
+        <table>
+          <tr><th>Total Carpet Length Required (including 10% waste)</th></tr>
+          <tr><td><strong>${totalCarpet.toFixed(2)} m</strong></td></tr>
+        </table>
+      `;
+
+      document.getElementById('output').innerHTML = html;
+    }
+
+    window.onload = () => {
+      addRoom(5.48, 4.08); // Your staff's test case
+    };
+  </script>
+</body>
+</html>

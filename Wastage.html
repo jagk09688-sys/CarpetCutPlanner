@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Multi-Room Carpet Calculator</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; max-width: 800px; }
+    input, select { margin-bottom: 8px; padding: 6px; width: 100%; box-sizing: border-box; }
+    button { padding: 10px 20px; margin-top: 10px; background-color: #2c3e50; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    .room-block { border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; border-radius: 6px; background: #f9f9f9; }
+    .result { background: #f0f8ff; padding: 15px; border-radius: 6px; margin-top: 20px; }
+    canvas { border: 1px solid #ccc; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h2>🧵 Multi-Room Carpet Calculator</h2>
+  <form id="carpetForm">
+    <div id="roomContainer"></div>
+    <button type="button" onclick="addRoom()">➕ Add Room</button><br><br>
+    <button type="submit">Calculate Carpet Usage</button>
+  </form>
+
+  <div id="output" class="result" style="display:none;"></div>
+  <canvas id="layoutCanvas" width="800" height="600"></canvas>
+
+  <script>
+    const CARPET_WIDTH = 3.66;
+    let roomCount = 0;
+    let leftoverStrips = [];
+
+    function addRoom() {
+      roomCount++;
+      const container = document.getElementById("roomContainer");
+      const div = document.createElement("div");
+      div.className = "room-block";
+      div.innerHTML = `
+        <h3>Room ${roomCount}</h3>
+        <label>Name:</label>
+        <input type="text" name="name${roomCount}" required>
+        <label>Floor Type:</label>
+        <select name="floor${roomCount}" required>
+          <option value="soft">Soft</option>
+          <option value="hard">Hard</option>
+        </select>
+        <label>Length (m):</label>
+        <input type="number" step="0.01" name="length${roomCount}" required>
+        <label>Width (m):</label>
+        <input type="number" step="0.01" name="width${roomCount}" required>
+      `;
+      container.appendChild(div);
+    }
+
+    document.getElementById("carpetForm").addEventListener("submit", function(e) {
+      e.preventDefault();
+      leftoverStrips = [];
+      const form = new FormData(e.target);
+      const rooms = [];
+      const output = document.getElementById("output");
+      const canvas = document.getElementById("layoutCanvas");
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      let totalArea = 0;
+      let totalCarpetUsed = 0;
+      let totalWastage = 0;
+      let yOffset = 10;
+
+      for (let i = 1; i <= roomCount; i++) {
+        const name = form.get(`name${i}`);
+        const floorType = form.get(`floor${i}`);
+        const originalLength = parseFloat(form.get(`length${i}`));
+        const width = parseFloat(form.get(`width${i}`));
+        if (!name || isNaN(originalLength) || isNaN(width)) continue;
+
+        const layoutWastage = +(originalLength * 0.10).toFixed(2);
+        const finishingAllowance = +(originalLength * 0.10).toFixed(2);
+        const adjustedLength = +(originalLength + layoutWastage + finishingAllowance).toFixed(2);
+        const roomArea = +(originalLength * width).toFixed(2);
+
+        let rolls = 1;
+        let effectiveWidth = width;
+        let reused = false;
+        let extraWidth = 0;
+        let carpetUsed = roomArea;
+        let wastage = 0;
+
+        if (floorType === "soft") {
+          if (width > CARPET_WIDTH) {
+            rolls = Math.ceil(width / CARPET_WIDTH);
+            effectiveWidth = rolls * CARPET_WIDTH;
+            extraWidth = +(effectiveWidth - width).toFixed(2);
+            carpetUsed = +(adjustedLength * effectiveWidth).toFixed(2);
+            wastage = +(carpetUsed - roomArea).toFixed(2);
+            if (extraWidth > 0) leftoverStrips.push(extraWidth);
+          } else {
+            const reusableIndex = leftoverStrips.findIndex(s => s >= width);
+            if (reusableIndex !== -1) {
+              reused = true;
+              effectiveWidth = width;
+              carpetUsed = +(adjustedLength * width).toFixed(2);
+              wastage = +(carpetUsed - roomArea).toFixed(2);
+              leftoverStrips[reusableIndex] -= width;
+              if (leftoverStrips[reusableIndex] < 0.01) leftoverStrips.splice(reusableIndex, 1);
+            } else {
+              rolls = 1;
+              effectiveWidth = CARPET_WIDTH;
+              extraWidth = +(CARPET_WIDTH - width).toFixed(2);
+              carpetUsed = +(adjustedLength * effectiveWidth).toFixed(2);
+              wastage = +(carpetUsed - roomArea).toFixed(2);
+              if (extraWidth > 0) leftoverStrips.push(extraWidth);
+            }
+          }
+        }
+
+        totalArea += roomArea;
+        totalCarpetUsed += carpetUsed;
+        totalWastage += wastage;
+
+        rooms.push({
+          name, floorType, originalLength, layoutWastage, finishingAllowance, adjustedLength,
+          width, roomArea, rolls, effectiveWidth, carpetUsed, wastage, reused
+        });
+
+        // Draw room on canvas
+        const scale = 50;
+        const w = width * scale;
+        const h = adjustedLength * scale;
+        ctx.fillStyle = reused ? "#c4f0c4" : (floorType === "soft" ? "#add8e6" : "#ffe4b5");
+        ctx.fillRect(10, yOffset, w, h);
+        ctx.strokeRect(10, yOffset, w, h);
+        ctx.fillStyle = "#000";
+        ctx.fillText(`${name} (${originalLength}m × ${width}m + layout + finish)`, 15, yOffset + 15);
+        yOffset += h + 20;
+      }
+
+      output.style.display = "block";
+      output.innerHTML = `
+        <h3>📐 Carpet Usage Summary</h3>
+        ${rooms.map(r => `
+          <p><strong>${r.name}</strong> (${r.floorType} floor): ${r.roomArea} m²<br>
+          Length (adjusted): ${r.adjustedLength} m (original: ${r.originalLength} m)<br>
+          ➕ Layout wastage: ${r.layoutWastage} m<br>
+          🧶 Finishing allowance: ${r.finishingAllowance} m<br>
+          ${r.floorType === "soft" ? `Rolls: ${r.rolls}, Effective Width: ${r.effectiveWidth.toFixed(2)}m<br>` : ""}
+          Carpet Used: ${r.carpetUsed} m², Wastage: ${r.wastage} m²
+          ${r.reused ? "<br>♻️ Reused leftover strip" : ""}
+          </p>
+        `).join("")}
+        <hr>
+        <p><strong>Total Room Area:</strong> ${totalArea.toFixed(2)} m²</p>
+        <p><strong>Total Carpet Used:</strong> ${totalCarpetUsed.toFixed(2)} m²</p>
+        <p><strong>Total Wastage:</strong> ${totalWastage.toFixed(2)} m²</p>
+        <p><strong>Remaining Reusable Strips (Soft floor only):</strong> ${leftoverStrips.map(s => s.toFixed(2)).join(", ") || "None"}</p>
+      `;
+    });
+
+    // Add initial room
+    addRoom();
+  </script>
+</body>
+</html>

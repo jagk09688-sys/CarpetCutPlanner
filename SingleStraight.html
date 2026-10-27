@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Floor Chart with Pen Input & Straight Line</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    canvas { border: 1px solid #ccc; touch-action: none; cursor: crosshair; }
+    #controls { margin-top: 10px; }
+    #orientation { margin-top: 10px; font-weight: bold; }
+    .label {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 2px 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📐 Floor Chart Drawing (Pen + Straight Line + Labels)</h2>
+<canvas id="floorCanvas" width="800" height="500"></canvas>
+
+<div id="controls">
+  <label>
+    <input type="checkbox" id="straightToggle" />
+    ✏️ Draw Straight Lines
+  </label>
+  <button onclick="clearCanvas()">🧹 Clear Canvas</button>
+  <button onclick="suggestOrientation()">📏 Suggest Carpet Orientation</button>
+</div>
+
+<div id="orientation"></div>
+
+<script>
+  const canvas = document.getElementById("floorCanvas");
+  const ctx = canvas.getContext("2d");
+  let isDrawing = false;
+  let startX = 0, startY = 0;
+  let currentX = 0, currentY = 0;
+  let shapes = [];
+  let currentShape = null;
+
+  canvas.addEventListener("pointerdown", (e) => {
+    if (e.pointerType === "pen" || e.pointerType === "mouse") {
+      isDrawing = true;
+      startX = e.offsetX;
+      startY = e.offsetY;
+      currentX = startX;
+      currentY = startY;
+      currentShape = {
+        points: [{ x: startX, y: startY }],
+        minX: startX,
+        minY: startY,
+        maxX: startX,
+        maxY: startY,
+        label: "Room",
+        id: Date.now()
+      };
+    }
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!isDrawing) return;
+    const straightMode = document.getElementById("straightToggle").checked;
+    currentX = e.offsetX;
+    currentY = e.offsetY;
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    redrawAllShapes();
+
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(currentX, currentY);
+    ctx.strokeStyle = "#0077cc";
+    ctx.lineWidth = e.pressure ? e.pressure * 5 : 2;
+    ctx.stroke();
+  });
+
+  canvas.addEventListener("pointerup", () => {
+    if (!isDrawing) return;
+    isDrawing = false;
+
+    const straightMode = document.getElementById("straightToggle").checked;
+    if (straightMode) {
+      currentShape.points.push({ x: currentX, y: currentY });
+      currentShape.minX = Math.min(startX, currentX);
+      currentShape.minY = Math.min(startY, currentY);
+      currentShape.maxX = Math.max(startX, currentX);
+      currentShape.maxY = Math.max(startY, currentY);
+    }
+
+    shapes.push(currentShape);
+    addLabel(currentShape);
+  });
+
+  function redrawAllShapes() {
+    shapes.forEach(shape => {
+      const pts = shape.points;
+      if (pts.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(pts[0].x, pts[0].y);
+      for (let i = 1; i < pts.length; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.strokeStyle = "#0077cc";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+  }
+
+  function addLabel(shape) {
+    const label = document.createElement("div");
+    label.className = "label";
+    label.style.left = `${canvas.offsetLeft + shape.minX + 5}px`;
+    label.style.top = `${canvas.offsetTop + shape.minY + 5}px`;
+    label.textContent = `${shape.label}`;
+    label.onclick = () => editLabel(shape, label);
+    document.body.appendChild(label);
+    shape.labelElement = label;
+  }
+
+  function editLabel(shape, labelEl) {
+    const newName = prompt("Enter room name:", shape.label);
+    if (newName !== null) shape.label = newName;
+
+    const width = prompt("Enter width (m):", ((shape.maxX - shape.minX) / 10).toFixed(2));
+    const height = prompt("Enter height (m):", ((shape.maxY - shape.minY) / 10).toFixed(2));
+
+    labelEl.textContent = `${shape.label} (${width}m x ${height}m)`;
+  }
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    shapes.forEach(s => s.labelElement?.remove());
+    shapes = [];
+    document.getElementById("orientation").textContent = "";
+  }
+
+  function suggestOrientation() {
+    if (shapes.length === 0) {
+      document.getElementById("orientation").textContent = "Draw at least one room to analyze orientation.";
+      return;
+    }
+
+    const last = shapes[shapes.length - 1];
+    const width = last.maxX - last.minX;
+    const height = last.maxY - last.minY;
+
+    const suggestion = width > height
+      ? "✅ Lay carpet along the width (longer axis) for seamless appearance and fewer joins."
+      : "✅ Lay carpet along the height (longer axis) for optimal flow and material efficiency.";
+
+    document.getElementById("orientation").textContent = suggestion;
+  }
+</script>
+
+</body>
+</html>

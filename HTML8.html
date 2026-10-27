@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Floor Plan Designer</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    canvas { border: 1px solid #ccc; }
+    #toolbar { margin-bottom: 10px; }
+    button, select, input { padding: 8px; margin-right: 10px; margin-bottom: 10px; }
+    #roomForm { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h2>📐 Floor Plan Designer</h2>
+  <div id="toolbar">
+    <button onclick="addRoom()">➕ Add Room</button>
+    <button onclick="saveLayout()">💾 Save</button>
+    <button onclick="loadLayout()">📂 Load</button>
+    <button onclick="exportPDF()">📤 Export PDF</button>
+  </div>
+
+  <div id="roomForm">
+    <label>Room Name:</label>
+    <input type="text" id="roomName" placeholder="e.g. Kitchen">
+    <label>Length (m):</label>
+    <input type="number" id="roomLength" step="0.01">
+    <label>Width (m):</label>
+    <input type="number" id="roomWidth" step="0.01">
+    <label>Floor Type:</label>
+    <select id="floorType">
+      <option value="Soft">Soft</option>
+      <option value="Hybrid">Hybrid</option>
+      <option value="Tiles">Tiles</option>
+    </select>
+    <label>Door Position:</label>
+    <select id="doorPosition">
+      <option value="none">None</option>
+      <option value="top">Top</option>
+      <option value="bottom">Bottom</option>
+      <option value="left">Left</option>
+      <option value="right">Right</option>
+    </select>
+  </div>
+
+  <canvas id="floorCanvas" width="1000" height="600"></canvas>
+
+  <script>
+    const canvas = new fabric.Canvas('floorCanvas');
+    const scale = 50; // 1 meter = 50 pixels
+
+    function getColor(floorType) {
+      switch (floorType) {
+        case "Soft": return "#add8e6";
+        case "Hybrid": return "#ffe4b5";
+        case "Tiles": return "#d3d3d3";
+        default: return "#ffffff";
+      }
+    }
+
+    function addRoom() {
+      const name = document.getElementById("roomName").value || "Room";
+      let length = parseFloat(document.getElementById("roomLength").value);
+      let width = parseFloat(document.getElementById("roomWidth").value);
+      const floorType = document.getElementById("floorType").value;
+      const door = document.getElementById("doorPosition").value;
+
+      if (isNaN(length) || isNaN(width)) {
+        alert("Please enter valid dimensions.");
+        return;
+      }
+
+      if (floorType === "Soft") {
+        width *= 1.12; // Add 12% finishing allowance
+        width = +width.toFixed(2);
+      }
+
+      const roomWidthPx = width * scale;
+      const roomHeightPx = length * scale;
+
+      const rect = new fabric.Rect({
+        left: 100,
+        top: 100,
+        fill: getColor(floorType),
+        width: roomWidthPx,
+        height: roomHeightPx,
+        stroke: 'black',
+        strokeWidth: 1
+      });
+
+      const label = new fabric.Textbox(`${name}\n${length}m × ${width}m\n${floorType}`, {
+        left: 110,
+        top: 110,
+        fontSize: 14,
+        width: roomWidthPx - 20,
+        editable: true
+      });
+
+      const objects = [rect, label];
+
+      // 🚪 Add door marker
+      const doorSize = 10;
+      const doorColor = 'red';
+      let doorRect;
+
+      switch (door) {
+        case "top":
+          doorRect = new fabric.Rect({
+            left: 100 + roomWidthPx / 2 - doorSize / 2,
+            top: 100,
+            width: doorSize,
+            height: 5,
+            fill: doorColor,
+            selectable: false
+          });
+          break;
+        case "bottom":
+          doorRect = new fabric.Rect({
+            left: 100 + roomWidthPx / 2 - doorSize / 2,
+            top: 100 + roomHeightPx - 5,
+            width: doorSize,
+            height: 5,
+            fill: doorColor,
+            selectable: false
+          });
+          break;
+        case "left":
+          doorRect = new fabric.Rect({
+            left: 100,
+            top: 100 + roomHeightPx / 2 - doorSize / 2,
+            width: 5,
+            height: doorSize,
+            fill: doorColor,
+            selectable: false
+          });
+          break;
+        case "right":
+          doorRect = new fabric.Rect({
+            left: 100 + roomWidthPx - 5,
+            top: 100 + roomHeightPx / 2 - doorSize / 2,
+            width: 5,
+            height: doorSize,
+            fill: doorColor,
+            selectable: false
+          });
+          break;
+      }
+
+      if (doorRect) {
+        objects.push(doorRect);
+      }
+
+      const group = new fabric.Group(objects, {
+        left: 100,
+        top: 100,
+        hasControls: true,
+        hasBorders: true
+      });
+
+      canvas.add(group);
+    }
+
+    function saveLayout() {
+      const layout = JSON.stringify(canvas.toJSON());
+      localStorage.setItem("floorPlan", layout);
+      alert("Layout saved!");
+    }
+
+    function loadLayout() {
+      const saved = localStorage.getItem("floorPlan");
+      if (saved) {
+        canvas.loadFromJSON(saved, canvas.renderAll.bind(canvas));
+        alert("Layout loaded!");
+      } else {
+        alert("No saved layout found.");
+      }
+    }
+
+    async function exportPDF() {
+      const canvasElement = document.querySelector("#floorCanvas");
+      const canvasImage = await html2canvas(canvasElement);
+      const imgData = canvasImage.toDataURL("image/png");
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF();
+      pdf.addImage(imgData, 'PNG', 10, 10, 180, 120);
+      pdf.save("floor-plan.pdf");
+    }
+  </script>
+</body>
+</html>

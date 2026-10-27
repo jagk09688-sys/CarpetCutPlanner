@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Floor Chart Drawing Tool</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    canvas { border: 1px solid #ccc; touch-action: none; cursor: crosshair; }
+    #controls { margin-top: 10px; }
+    #orientation { margin-top: 10px; font-weight: bold; }
+    .label {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 2px 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📐 Floor Chart Drawing (Freehand + Straight Line + Labels)</h2>
+<canvas id="floorCanvas" width="800" height="500"></canvas>
+
+<div id="controls">
+  <label>
+    <input type="checkbox" id="straightToggle" />
+    ✏️ Draw Straight Lines
+  </label>
+  <button onclick="clearCanvas()">🧹 Clear Canvas</button>
+  <button onclick="suggestOrientation()">📏 Suggest Carpet Orientation</button>
+</div>
+
+<div id="orientation"></div>
+
+<script>
+  const canvas = document.getElementById("floorCanvas");
+  const ctx = canvas.getContext("2d");
+  let isDrawing = false;
+  let startX = 0, startY = 0;
+  let shapes = [];
+
+  canvas.addEventListener("pointerdown", (e) => {
+    isDrawing = true;
+    startX = e.offsetX;
+    startY = e.offsetY;
+  });
+
+  canvas.addEventListener("pointerup", (e) => {
+    if (!isDrawing) return;
+    isDrawing = false;
+
+    const endX = e.offsetX;
+    const endY = e.offsetY;
+    const straightMode = document.getElementById("straightToggle").checked;
+
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = "#0077cc";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    const shape = {
+      startX,
+      startY,
+      endX,
+      endY,
+      minX: Math.min(startX, endX),
+      minY: Math.min(startY, endY),
+      maxX: Math.max(startX, endX),
+      maxY: Math.max(startY, endY),
+      label: "Room",
+      id: Date.now()
+    };
+
+    shapes.push(shape);
+    addLabel(shape);
+  });
+
+  function addLabel(shape) {
+    const label = document.createElement("div");
+    label.className = "label";
+    label.style.left = `${canvas.offsetLeft + shape.minX + 5}px`;
+    label.style.top = `${canvas.offsetTop + shape.minY + 5}px`;
+    label.textContent = `${shape.label}`;
+    label.onclick = () => editLabel(shape, label);
+    document.body.appendChild(label);
+    shape.labelElement = label;
+  }
+
+  function editLabel(shape, labelEl) {
+    const newName = prompt("Enter room name:", shape.label);
+    if (newName !== null) shape.label = newName;
+
+    const width = prompt("Enter width (m):", ((shape.maxX - shape.minX) / 10).toFixed(2));
+    const height = prompt("Enter height (m):", ((shape.maxY - shape.minY) / 10).toFixed(2));
+
+    labelEl.textContent = `${shape.label} (${width}m x ${height}m)`;
+  }
+
+  function clearCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    shapes.forEach(s => s.labelElement?.remove());
+    shapes = [];
+    document.getElementById("orientation").textContent = "";
+  }
+
+  function suggestOrientation() {
+    if (shapes.length === 0) {
+      document.getElementById("orientation").textContent = "Draw at least one room to analyze orientation.";
+      return;
+    }
+
+    const last = shapes[shapes.length - 1];
+    const width = last.maxX - last.minX;
+    const height = last.maxY - last.minY;
+
+    const suggestion = width > height
+      ? "✅ Lay carpet along the width (longer axis) for seamless appearance and fewer joins."
+      : "✅ Lay carpet along the height (longer axis) for optimal flow and material efficiency.";
+
+    document.getElementById("orientation").textContent = suggestion;
+  }
+</script>
+
+</body>
+</html>

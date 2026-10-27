@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Carpet Joint Calculator</title>
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #e5e7eb; padding: 24px; }
+    .wrap { max-width: 800px; margin: auto; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8; }
+    input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e5e7eb; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .btns { display: flex; gap: 10px; margin-top: 10px; }
+    button { background: #38bdf8; color: #001226; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    .result { margin-top: 10px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; border-bottom: 1px solid #1f2937; font-size: 14px; text-align: left; }
+    th { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Carpet Joint Calculator</h1>
+    <div class="card">
+      <div class="row">
+        <div>
+          <label>Room Length (m)</label>
+          <input type="number" id="roomLength" step="0.01" value="5.48" />
+        </div>
+        <div>
+          <label>Room Width (m)</label>
+          <input type="number" id="roomWidth" step="0.01" value="4.08" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>Roll Width (m)</label>
+          <input type="number" id="rollWidth" step="0.01" value="3.66" />
+        </div>
+        <div>
+          <label>Number of Joints</label>
+          <input type="number" id="jointCount" step="1" value="3" />
+        </div>
+      </div>
+      <div class="btns">
+        <button onclick="calculate()">Calculate</button>
+      </div>
+    </div>
+
+    <div id="output" class="card"></div>
+  </div>
+
+  <script>
+    function calculate() {
+      const L = parseFloat(document.getElementById('roomLength').value);
+      const W = parseFloat(document.getElementById('roomWidth').value);
+      const rollW = parseFloat(document.getElementById('rollWidth').value);
+      const joints = parseInt(document.getElementById('jointCount').value);
+
+      const uncovered = W - rollW;
+      const jointWidth = uncovered / joints;
+
+      // Staff logic: each joint strip uses 0.7 m of carpet
+      const jointStripLength = 0.7;
+      const totalJointLength = joints * jointStripLength;
+      const totalCarpet = L + totalJointLength;
+
+      const html = `
+        <div class="result">
+          <strong>Main strip:</strong> 1 × ${L.toFixed(2)} m × ${rollW.toFixed(2)} m<br>
+          <strong>Remaining width:</strong> ${uncovered.toFixed(2)} m<br>
+          <strong>Joint strategy:</strong> ${joints} strips × ${jointWidth.toFixed(2)} m width × ${jointStripLength.toFixed(2)} m length<br>
+          <strong>Total carpet length required:</strong> <span style="color:#22c55e; font-weight:bold;">${totalCarpet.toFixed(2)} m</span>
+        </div>
+        <table>
+          <tr><th>Component</th><th>Length (m)</th></tr>
+          <tr><td>Main strip</td><td>${L.toFixed(2)}</td></tr>
+          <tr><td>Joint strips</td><td>${totalJointLength.toFixed(2)}</td></tr>
+          <tr><td><strong>Total</strong></td><td><strong>${totalCarpet.toFixed(2)}</strong></td></tr>
+        </table>
+      `;
+
+      document.getElementById('output').innerHTML = html;
+    }
+  </script>
+</body>
+</html>

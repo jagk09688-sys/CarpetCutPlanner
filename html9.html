@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Room Layout with Clickable Doors</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
+  <style>
+    body { font-family: Arial; margin: 20px; }
+    canvas { border: 1px solid #ccc; }
+    input, button { margin: 5px; padding: 8px; }
+  </style>
+</head>
+<body>
+  <h2>🛠️ Room Designer with Door Marking</h2>
+  <label>Room Name:</label>
+  <input type="text" id="roomName" placeholder="e.g. Bedroom">
+  <label>Length (m):</label>
+  <input type="number" id="roomLength" step="0.01">
+  <label>Width (m):</label>
+  <input type="number" id="roomWidth" step="0.01">
+  <label>Floor Type:</label>
+  <select id="floorType">
+    <option value="Soft">Soft</option>
+    <option value="Hybrid">Hybrid</option>
+    <option value="Tiles">Tiles</option>
+  </select>
+  <button onclick="addRoom()">➕ Add Room</button>
+  <button onclick="enableDoorMarking()">🚪 Mark Door</button>
+  <canvas id="floorCanvas" width="1000" height="600"></canvas>
+
+  <script>
+    const canvas = new fabric.Canvas('floorCanvas');
+    const scale = 50;
+    let doorMarkingMode = false;
+    let lastRoomGroup = null;
+
+    function getColor(type) {
+      return {
+        Soft: "#add8e6",
+        Hybrid: "#ffe4b5",
+        Tiles: "#d3d3d3"
+      }[type] || "#ffffff";
+    }
+
+    function addRoom() {
+      const name = document.getElementById("roomName").value || "Room";
+      let length = parseFloat(document.getElementById("roomLength").value);
+      let width = parseFloat(document.getElementById("roomWidth").value);
+      const floorType = document.getElementById("floorType").value;
+
+      if (isNaN(length) || isNaN(width)) {
+        alert("Enter valid dimensions.");
+        return;
+      }
+
+      if (floorType === "Soft") {
+        width *= 1.12;
+        width = +width.toFixed(2);
+      }
+
+      const roomWidthPx = width * scale;
+      const roomHeightPx = length * scale;
+      const baseX = 100, baseY = 100;
+
+      const rect = new fabric.Rect({
+        left: baseX,
+        top: baseY,
+        width: roomWidthPx,
+        height: roomHeightPx,
+        fill: getColor(floorType),
+        stroke: 'black',
+        strokeWidth: 1
+      });
+
+      const label = new fabric.Textbox(`${name}\n${length}m × ${width}m\n${floorType}`, {
+        left: baseX + 10,
+        top: baseY + 10,
+        fontSize: 14,
+        width: roomWidthPx - 20,
+        editable: true
+      });
+
+      const group = new fabric.Group([rect, label], {
+        left: baseX,
+        top: baseY,
+        hasControls: true,
+        hasBorders: true
+      });
+
+      canvas.add(group);
+      lastRoomGroup = group;
+    }
+
+    function enableDoorMarking() {
+      if (!lastRoomGroup) {
+        alert("Add a room first.");
+        return;
+      }
+      doorMarkingMode = true;
+      alert("Click on the room to mark a door.");
+    }
+
+    canvas.on('mouse:down', function(options) {
+      if (!doorMarkingMode || !options.pointer || !lastRoomGroup) return;
+
+      const { x, y } = options.pointer;
+      const roomBounds = lastRoomGroup.getBoundingRect();
+
+      if (
+        x >= roomBounds.left &&
+        x <= roomBounds.left + roomBounds.width &&
+        y >= roomBounds.top &&
+        y <= roomBounds.top + roomBounds.height
+      ) {
+        const doorSize = 10;
+        const doorColor = 'red';
+
+        const doorRect = new fabric.Rect({
+          left: x - doorSize / 2,
+          top: y - doorSize / 2,
+          width: doorSize,
+          height: doorSize,
+          fill: doorColor,
+          selectable: false
+        });
+
+        const doorLabel = new fabric.Text("🚪", {
+          left: x - 6,
+          top: y - 20,
+          fontSize: 12,
+          selectable: false
+        });
+
+        canvas.add(doorRect);
+        canvas.add(doorLabel);
+        doorMarkingMode = false;
+      }
+    });
+  </script>
+</body>
+</html>

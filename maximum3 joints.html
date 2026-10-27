@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hybrid Carpet Cut Optimizer</title>
+  <style>
+    body { font-family: sans-serif; background: #0f172a; color: #e5e7eb; padding: 24px; }
+    .wrap { max-width: 900px; margin: auto; }
+    h1 { font-size: 24px; margin-bottom: 8px; }
+    .card { background: #111827; border: 1px solid #1f2937; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-size: 12px; margin-bottom: 4px; color: #94a3b8; }
+    input, select { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: #e5e7eb; }
+    .row { display: grid; grid-template-columns: 1.2fr 1fr 1fr 1fr; gap: 12px; align-items: end; margin-bottom: 12px; }
+    .btns { display: flex; gap: 10px; margin-top: 10px; }
+    button { background: #38bdf8; color: #001226; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    button.secondary { background: transparent; color: #38bdf8; border: 1px solid #38bdf8; }
+    .result { margin-top: 10px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { padding: 8px; border-bottom: 1px solid #1f2937; font-size: 14px; text-align: left; }
+    th { color: #94a3b8; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Hybrid Carpet Cut Optimizer</h1>
+    <div class="card">
+      <label>Primary Roll Width (m)</label>
+      <select id="rollWidth">
+        <option value="3.66">3.66</option>
+        <option value="4.0">4.0</option>
+      </select>
+      <label>Alternate Roll Width (m)</label>
+      <select id="altRollWidth">
+        <option value="2.0">2.0</option>
+        <option value="1.0">1.0</option>
+        <option value="0.5">0.5</option>
+      </select>
+    </div>
+
+    <div class="card" id="roomContainer"></div>
+
+    <div class="btns">
+      <button onclick="addRoom()">Add Room</button>
+      <button onclick="calculate()">Calculate</button>
+    </div>
+
+    <div id="output" class="card"></div>
+  </div>
+
+  <script>
+    let roomCount = 0;
+
+    function addRoom(length = '', width = '') {
+      roomCount++;
+      const container = document.getElementById('roomContainer');
+      container.insertAdjacentHTML('beforeend', `
+        <div class="row" id="room${roomCount}">
+          <div><strong>Room ${roomCount}</strong></div>
+          <div>
+            <label>Length (m)</label>
+            <input type="number" step="0.01" value="${length}" id="l${roomCount}" />
+          </div>
+          <div>
+            <label>Width (m)</label>
+            <input type="number" step="0.01" value="${width}" id="w${roomCount}" />
+          </div>
+          <div>
+            <button class="secondary" onclick="removeRoom(${roomCount})">Remove</button>
+          </div>
+        </div>
+      `);
+    }
+
+    function removeRoom(id) {
+      const room = document.getElementById(`room${id}`);
+      if (room) room.remove();
+    }
+
+    function calculate() {
+      const rollW = parseFloat(document.getElementById('rollWidth').value || '3.66');
+      const altW = parseFloat(document.getElementById('altRollWidth').value || '2.0');
+      let totalBeforeWaste = 0;
+      let totalAfterWaste = 0;
+      let html = "";
+
+      for (let i = 1; i <= roomCount; i++) {
+        const l = document.getElementById(`l${i}`);
+        const w = document.getElementById(`w${i}`);
+        if (!l || !w) continue;
+
+        const L = parseFloat(l.value);
+        const W = parseFloat(w.value);
+
+        const direction = L >= W ? "length" : "width";
+        const stripLength = direction === "length" ? L : W;
+        const stripSide = direction === "length" ? W : L;
+
+        const fullStrips = Math.floor(stripSide / rollW);
+        const covered = fullStrips * rollW;
+        const leftover = stripSide - covered;
+
+        const cuts = [];
+        let totalLength = 0;
+
+        // Full strips using primary roll
+        for (let j = 0; j < fullStrips; j++) {
+          cuts.push(`${stripLength.toFixed(2)} × ${rollW.toFixed(2)}`);
+        }
+        totalLength += fullStrips * stripLength;
+
+        // Fill leftover using alternate roll
+        if (leftover > 0.01) {
+          const altStrips = Math.ceil(leftover / altW);
+          const altWidth = leftover / altStrips;
+          for (let k = 0; k < altStrips; k++) {
+            cuts.push(`${stripLength.toFixed(2)} × ${altWidth.toFixed(2)} (alt roll)`);
+          }
+          totalLength += altStrips * stripLength;
+        }
+
+        const totalWithWaste = totalLength * 1.10;
+        totalBeforeWaste += totalLength;
+        totalAfterWaste += totalWithWaste;
+
+        html += `
+          <div class="result">
+            <strong>Room ${i}</strong><br>
+            Carpet runs along ${direction}<br>
+            Strips:<br>
+            ${cuts.map(c => `• ${c}`).join('<br>')}<br>
+            Total carpet before waste: ${totalLength.toFixed(2)} m<br>
+            <strong>Total with 10% waste: ${totalWithWaste.toFixed(2)} m</strong>
+          </div>
+        `;
+      }
+
+      html += `
+        <table>
+          <tr><th>Total Carpet Before Waste</th><th>Total Carpet After 10% Waste</th></tr>
+          <tr>
+            <td><strong>${totalBeforeWaste.toFixed(2)} m</strong></td>
+            <td><strong>${totalAfterWaste.toFixed(2)} m</strong></td>
+          </tr>
+        </table>
+      `;
+
+      document.getElementById('output').innerHTML = html;
+    }
+
+    window.onload = () => {
+      addRoom(5.48, 4.08);
+    };
+  </script>
+</body>
+</html>

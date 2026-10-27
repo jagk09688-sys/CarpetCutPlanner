@@ -1,0 +1,33 @@
+<canvas id="floorCanvas" width="800" height="600"></canvas>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.2.4/fabric.min.js"></script>
+<script>
+const canvas = new fabric.Canvas('floorCanvas');
+canvas.on('mouse:down', function (opt) {
+  const pointer = canvas.getPointer(opt.e);
+  const rect = new fabric.Rect({
+    left: pointer.x,
+    top: pointer.y,
+    width: 100,
+    height: 80,
+    fill: 'lightblue',
+    stroke: 'black',
+    strokeWidth: 1,
+    hasControls: true,
+    hasBorders: true
+  });
+
+  const label = new fabric.Text('Room 1\n100×80', {
+    left: pointer.x + 5,
+    top: pointer.y + 5,
+    fontSize: 14,
+    fill: 'black'
+  });
+
+  const group = new fabric.Group([rect, label], {
+    left: pointer.x,
+    top: pointer.y
+  });
+
+  canvas.add(group);
+});
+</script>

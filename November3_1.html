@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Floor Chart – Click-to-Edit Labels</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    canvas { border: 1px solid #ccc; cursor: crosshair; touch-action: none; }
+    #controls { margin-top: 10px; }
+    .label {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 2px 6px;
+      font-size: 14px;
+      transform: translate(-50%, -50%);
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📐 Floor Chart – Click-to-Edit Room Labels</h2>
+<canvas id="floorCanvas" width="800" height="500"></canvas>
+
+<div id="controls">
+  <button onclick="addRoom('Living Room')">➕ Add Living Room</button>
+  <button onclick="addRoom('Bedroom')">➕ Add Bedroom</button>
+  <button onclick="addRoom('Dining Area')">➕ Add Dining Area</button>
+  <label><input type="checkbox" id="penModeToggle" /> ✍️ Enable Pen Drawing</label>
+  <label><input type="checkbox" id="straightLineToggle" /> 📏 Straight Line Mode</label>
+  <button onclick="clearLast()">🧹 Clear Last</button>
+  <button onclick="clearAll()">🧼 Clear All</button>
+</div>
+
+<script>
+const canvas = document.getElementById("floorCanvas");
+const ctx = canvas.getContext("2d");
+let rooms = [], drawings = [], history = [];
+let draggingRoom = null, offsetX = 0, offsetY = 0;
+const gridSize = 20;
+let isDrawing = false, currentPath = [], straightLineMode = false, startPoint = null;
+
+function addRoom(name) {
+  const room = {
+    name,
+    x: 100 + rooms.length * 50,
+    y: 100 + rooms.length * 30,
+    width: 120,
+    height: 80,
+    id: Date.now()
+  };
+  rooms.push(room);
+  history.push({ type: "room", ref: room });
+  addLabel(room);
+  drawCanvas();
+}
+
+function drawCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  rooms.forEach(room => {
+    ctx.fillStyle = "#e0f7fa";
+    ctx.fillRect(room.x, room.y, room.width, room.height);
+    ctx.strokeStyle = "#0077cc";
+    ctx.strokeRect(room.x, room.y, room.width, room.height);
+    updateLabelPosition(room);
+  });
+
+  drawings.forEach(path => {
+    ctx.beginPath();
+    for (let i = 0; i < path.length - 1; i++) {
+      ctx.moveTo(path[i].x, path[i].y);
+      ctx.lineTo(path[i + 1].x, path[i + 1].y);
+    }
+    ctx.strokeStyle = "#ff5722";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  });
+}
+
+function addLabel(room) {
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "label";
+  input.value = `${room.name} (${(room.width / 10).toFixed(2)}m x ${(room.height / 10).toFixed(2)}m)`;
+
+  input.onblur = () => {
+    const match = input.value.match(/^(.+?)\s*\(([\d.]+)m\s*x\s*([\d.]+)m\)$/);
+    if (match) {
+      room.name = match[1].trim();
+      room.width = parseFloat(match[2]) * 10;
+      room.height = parseFloat(match[3]) * 10;
+    } else {
+      room.name = input.value.trim();
+    }
+    input.value = `${room.name} (${(room.width / 10).toFixed(2)}m x ${(room.height / 10).toFixed(2)}m)`;
+    drawCanvas();
+  };
+
+  input.onkeydown = (e) => {
+    if (e.key === "Enter") input.blur();
+  };
+
+  document.body.appendChild(input);
+  room.labelElement = input;
+  updateLabelPosition(room);
+}
+
+function updateLabelPosition(room) {
+  const rect = canvas.getBoundingClientRect();
+  room.labelElement.style.left = `${rect.left + window.scrollX + room.x + room.width / 2}px`;
+  room.labelElement.style.top = `${rect.top + window.scrollY + room.y + room.height / 2}px`;
+}
+
+canvas.addEventListener("mousedown", (e) => {
+  const penMode = document.getElementById("penModeToggle").checked;
+  straightLineMode = document.getElementById("straightLineToggle").checked;
+
+  if (penMode) {
+    if (straightLineMode) {
+      startPoint = { x: e.offsetX, y: e.offsetY };
+    } else {
+      isDrawing = true;
+      currentPath = [{ x: e.offsetX, y: e.offsetY }];
+    }
+    return;
+  }
+
+  const x = e.offsetX, y = e.offsetY;
+  draggingRoom = rooms.find(r => x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height);
+  if (draggingRoom) {
+    offsetX = x - draggingRoom.x;
+    offsetY = y - draggingRoom.y;
+  }
+
+  const clickedRoom = rooms.find(r => x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height);
+  if (clickedRoom) clickedRoom.labelElement?.focus();
+});
+
+canvas.addEventListener("mousemove", (e) => {
+  const penMode = document.getElementById("penModeToggle").checked;
+  if (penMode && isDrawing) {
+    currentPath.push({ x: e.offsetX, y: e.offsetY });
+    drawCanvas();
+    ctx.beginPath();
+    for (let i = 0; i < currentPath.length - 1; i++) {
+      ctx.moveTo(currentPath[i].x, currentPath[i].y);
+      ctx.lineTo(currentPath[i + 1].x, currentPath[i + 1].y);
+    }
+    ctx.strokeStyle = "#ff5722";
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    return;
+  }
+  if (!draggingRoom) return;
+  let newX = Math.round((e.offsetX - offsetX) / gridSize) * gridSize;
+  let newY = Math.round((e.offsetY - offsetY) / gridSize) * gridSize;
+  draggingRoom.x = newX;
+  draggingRoom.y = newY;
+  drawCanvas();
+});
+
+canvas.addEventListener("mouseup", (e) => {
+  const penMode = document.getElementById("penModeToggle").checked;
+  if (penMode) {
+    if (straightLineMode && startPoint) {
+      const endPoint = { x: e.offsetX, y: e.offsetY };
+      const line = [startPoint, endPoint];
+      drawings.push(line);
+      history.push({ type: "drawing", ref: line });
+      drawCanvas();
+      startPoint = null;
+    } else if (isDrawing) {
+      drawings.push(currentPath);
+      history.push({ type: "drawing", ref: currentPath });
+      isDrawing = false;
+    }
+    return;
+  }
+  draggingRoom = null;
+});
+
+canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  const x = e.offsetX, y = e.offsetY;
+  const room = rooms.find(r => x >= r.x && x <= r.x + r.width && y >= r.y && y <= r.y + r.height);
+  if (room) {
+    const action = prompt("Type 'w' to increase width or 'h' to increase height:");
+    if (action === "w") room.width += 20;
+    if (action === "h") room.height += 20;
+    drawCanvas();
+    room.labelElement.value = `${room.name} (${(room.width / 10).toFixed(2)}m x ${(room.height / 10).toFixed(2)}m)`;
+  }
+});
+
+function clearLast() {
+  if (history.length === 0) return;
+  const last = history.pop();
+  if (last.type === "room") {
+    if (last.ref.labelElement && last.ref.labelElement.parentNode) {
+      last.ref.labelElement.parentNode.removeChild(last.ref.labelElement);
+    }
+    rooms = rooms.filter(r => r !== last.ref);
+  } else if (last.type === "drawing") {
+    drawings = drawings.filter(d => d !== last.ref);
+  }
+  drawCanvas();
+}
+
+function clearAll() {
+  // Clear the canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Remove all label inputs from the DOM
+  rooms.forEach(room => {
+    if (room.labelElement && room.labelElement.parentNode) {
+      room.labelElement.parentNode.removeChild(room.labelElement);
+    }
+  });
+
+  // Reset all data structures
+  rooms = [];
+  drawings = [];
+  history = [];
+}

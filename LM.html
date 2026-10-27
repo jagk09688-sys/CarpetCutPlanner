@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Carpet Planner (2.0 m roll)</title>
+  <style>
+    :root { --bg:#0f172a; --card:#111827; --text:#e5e7eb; --muted:#94a3b8; --accent:#38bdf8; --good:#22c55e; --warn:#f59e0b; }
+    body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); margin: 0; padding: 24px; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 24px; margin: 0 0 8px; }
+    p.helper { color: var(--muted); margin: 0 0 16px; }
+    .card { background: var(--card); border: 1px solid #1f2937; border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 6px; }
+    input { width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #334155; background: #0b1220; color: var(--text); }
+    .row { display: grid; grid-template-columns: 1.3fr 1fr 1fr 1fr; gap: 12px; align-items: end; }
+    .row h3 { margin: 8px 0; font-size: 16px; }
+    .btns { display: flex; gap: 10px; align-items: center; }
+    button { background: var(--accent); color: #001226; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+    button.secondary { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+    .result { margin-top: 10px; font-size: 14px; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; margin-right: 6px; }
+    .good { background: #052e1a; color: var(--good); border: 1px solid #14532d; }
+    .warn { background: #2a1905; color: var(--warn); border: 1px solid #7c3e08; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { text-align: left; padding: 8px; border-bottom: 1px solid #1f2937; font-size: 14px; }
+    th { color: var(--muted); font-weight: 600; }
+    .note { color: var(--muted); font-size: 12px; margin-top: 6px; }
+    .totals { font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>Carpet planner</h1>
+    <p class="helper">Fixed roll width: 2.0 m. This picks the layout with fewer seams first, then lower waste.</p>
+
+    <div class="card grid">
+      <div>
+        <label>Roll width (m)</label>
+        <input type="number" id="rollWidth" step="0.1" value="2.0" />
+      </div>
+      <div>
+        <label>Priority</label>
+        <select id="priority" style="width:100%; padding:10px; border-radius:8px; border:1px solid #334155; background:#0b1220; color:var(--text);">
+          <option value="seams">Minimize seams first</option>
+          <option value="waste">Minimize waste first</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="row">
+        <div><h3>Room 1</h3></div>
+        <div>
+          <label>Length (m)</label>
+          <input type="number" id="l1" step="0.1" value="5.2" />
+        </div>
+        <div>
+          <label>Width (m)</label>
+          <input type="number" id="w1" step="0.1" value="3.3" />
+        </div>
+        <div class="btns">
+          <button onclick="calc()">Calculate</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><h3>Room 2</h3></div>
+        <div>
+          <label>Length (m)</label>
+          <input type="number" id="l2" step="0.1" value="4.0" />
+        </div>
+        <div>
+          <label>Width (m)</label>
+          <input type="number" id="w2" step="0.1" value="3.0" />
+        </div>
+        <div class="btns">
+          <button class="secondary" onclick="resetToDefaults()">Reset</button>
+        </div>
+      </div>
+      <div class="row">
+        <div><h3>Room 3</h3></div>
+        <div>
+          <label>Length (m)</label>
+          <input type="number" id="l3" step="0.1" value="7.5" />
+        </div>
+        <div>
+          <label>Width (m)</label>
+          <input type="number" id="w3" step="0.1" value="1.5" />
+        </div>
+      </div>
+    </div>
+
+    <div id="output" class="card"></div>
+  </div>
+
+  <script>
+    function planRoom(L, W, rollW, priority) {
+      // Orientation A: strips run along length (piece length = L, count = ceil(W/rollW))
+      const stripsA = Math.ceil(W / rollW);
+      const linearA = stripsA * L;               // total linear meters from roll
+      const seamsA = Math.max(0, stripsA - 1);
+      const overWidthA = stripsA * rollW - W;    // excess width coverage
+
+      // Orientation B: strips run along width (piece length = W, count = ceil(L/rollW))
+      const stripsB = Math.ceil(L / rollW);
+      const linearB = stripsB * W;
+      const seamsB = Math.max(0, stripsB - 1);
+      const overWidthB = stripsB * rollW - L;    // excess length coverage
+
+      // Choose layout: prioritize fewer seams, then lower linear meters, then lower over-coverage
+      let choice = "A";
+      if (priority === "seams") {
+        if (seamsB < seamsA) choice = "B";
+        else if (seamsB === seamsA) {
+          if (linearB < linearA) choice = "B";
+          else if (linearB === linearA && overWidthB < overWidthA) choice = "B";
+        }
+      } else { // priority === "waste"
+        if (linearB < linearA) choice = "B";
+        else if (linearB === linearA) {
+          if (seamsB < seamsA) choice = "B";
+          else if (seamsB === seamsA && overWidthB < overWidthA) choice = "B";
+        }
+      }
+
+      const pick = choice === "A" ? {
+        orientation: "Strips along length",
+        strips: stripsA, seams: seamsA, lm: linearA, excess: overWidthA
+      } : {
+        orientation: "Strips along width",
+        strips: stripsB, seams: seamsB, lm: linearB, excess: overWidthB
+      };
+
+      const other = choice === "A" ? {
+        orientation: "Strips along width",
+        strips: stripsB, seams: seamsB, lm: linearB, excess: overWidthB
+      } : {
+        orientation: "Strips along length",
+        strips: stripsA, seams: seamsA, lm: linearA, excess: overWidthA
+      };
+
+      return { pick, other };
+    }
+
+    function fmt(n) { return (Math.round(n * 100) / 100).toFixed(2); }
+
+    function calc() {
+      const rollW = parseFloat(document.getElementById('rollWidth').value || '2.0');
+      const priority = document.getElementById('priority').value;
+
+      const rooms = [
+        { name: "Room 1", L: parseFloat(document.getElementById('l1').value), W: parseFloat(document.getElementById('w1').value) },
+        { name: "Room 2", L: parseFloat(document.getElementById('l2').value), W: parseFloat(document.getElementById('w2').value) },
+        { name: "Room 3", L: parseFloat(document.getElementById('l3').value), W: parseFloat(document.getElementById('w3').value) }
+      ];
+
+      let html = "";
+      let totalLM = 0, totalSeams = 0, totalExcess = 0;
+
+      rooms.forEach(r => {
+        const { pick, other } = planRoom(r.L, r.W, rollW, priority);
+        totalLM += pick.lm;
+        totalSeams += pick.seams;
+        totalExcess += pick.excess;
+
+        html += `
+          <div class="result">
+            <span class="tag good">Recommended</span>
+            <strong>${r.name}:</strong> ${pick.orientation}
+            — strips: ${pick.strips}, seams: ${pick.seams}, linear meters: ${fmt(pick.lm)}, excess cover: ${fmt(pick.excess)} m
+            <div class="note">Alternative: ${other.orientation} — strips: ${other.strips}, seams: ${other.seams}, linear meters: ${fmt(other.lm)}, excess: ${fmt(other.excess)} m</div>
+          </div>
+        `;
+      });
+
+      html += `
+        <table>
+          <tr><th>Total linear meters</th><th>Total seams</th><th>Total excess cover (m)</th></tr>
+          <tr class="totals"><td>${fmt(totalLM)}</td><td>${totalSeams}</td><td>${fmt(totalExcess)}</td></tr>
+        </table>
+        <div class="note">Linear meters is the sum of piece lengths cut from the roll. Excess cover shows how much extra width/length is covered beyond room size (trimmed waste).</div>
+      `;
+
+      document.getElementById('output').innerHTML = html;
+    }
+
+    function resetToDefaults() {
+      document.getElementById('rollWidth').value = '2.0';
+      document.getElementById('priority').value = 'seams';
+      document.getElementById('l1').value = '5.2';
+      document.getElementById('w1').value = '3.3';
+      document.getElementById('l2').value = '4.0';
+      document.getElementById('w2').value = '3.0';
+      document.getElementById('l3').value = '7.5';
+      document.getElementById('w3').value = '1.5';
+      document.getElementById('output').innerHTML = '';
+    }
+
+    // Auto-calc on load with provided values
+    window.addEventListener('DOMContentLoaded', calc);
+  </script>
+</body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Floor Chart with Pen Input</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    canvas {
+      border: 1px solid #ccc;
+      touch-action: none;
+    }
+    #controls {
+      margin-top: 10px;
+    }
+    #orientation {
+      margin-top: 10px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🧱 Floor Chart Drawing (Pen Accessible)</h2>
+  <canvas id="floorCanvas" width="800" height="500"></canvas>
+
+  <div id="controls">
+    <button onclick="clearCanvas()">🧹 Clear Canvas</button>
+    <button onclick="suggestOrientation()">📐 Suggest Carpet Orientation</button>
+  </div>
+
+  <div id="orientation"></div>
+
+  <script>
+    const canvas = document.getElementById("floorCanvas");
+    const ctx = canvas.getContext("2d");
+    let isDrawing = false;
+    let lastX = 0;
+    let lastY = 0;
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+    canvas.addEventListener("pointerdown", (e) => {
+      if (e.pointerType === "pen" || e.pointerType === "mouse") {
+        isDrawing = true;
+        [lastX, lastY] = [e.offsetX, e.offsetY];
+        updateBounds(e.offsetX, e.offsetY);
+      }
+    });
+
+    canvas.addEventListener("pointermove", (e) => {
+      if (!isDrawing) return;
+      ctx.beginPath();
+      ctx.moveTo(lastX, lastY);
+      ctx.lineTo(e.offsetX, e.offsetY);
+      ctx.strokeStyle = "#0077cc";
+      ctx.lineWidth = e.pressure ? e.pressure * 5 : 2;
+      ctx.stroke();
+      [lastX, lastY] = [e.offsetX, e.offsetY];
+      updateBounds(e.offsetX, e.offsetY);
+    });
+
+    canvas.addEventListener("pointerup", () => {
+      isDrawing = false;
+    });
+
+    function clearCanvas() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      minX = Infinity; minY = Infinity; maxX = -Infinity; maxY = -Infinity;
+      document.getElementById("orientation").textContent = "";
+    }
+
+    function updateBounds(x, y) {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x);
+      maxY = Math.max(maxY, y);
+    }
+
+    function suggestOrientation() {
+      const width = maxX - minX;
+      const height = maxY - minY;
+      if (width === 0 || height === 0) {
+        document.getElementById("orientation").textContent = "Draw a shape first to analyze orientation.";
+        return;
+      }
+      const suggestion = width > height
+        ? "✅ Lay carpet along the width (longer axis) for aesthetic continuity and reduced joins."
+        : "✅ Lay carpet along the height (longer axis) for optimal flow and material usage.";
+      document.getElementById("orientation").textContent = suggestion;
+    }
+  </script>
+
+</body>
+</html>

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+ <html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Floor Chart – Stepwise Clear</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; }
+    canvas { border: 1px solid #ccc; cursor: crosshair; touch-action: none; }
+    #controls { margin-top: 10px; }
+    .label {
+      position: absolute;
+      background: #fff;
+      border: 1px solid #ccc;
+      padding: 2px 6px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<h2>📐 Floor Chart – Manual Rooms + Pen Drawing + Stepwise Clear</h2>
+<canvas id="floorCanvas" width="800" height="500"></canvas>
+
+<div id="controls">
+  <button onclick="addRoom('Living Room')">➕ Add Living Room</button>
+  <button onclick="addRoom('Bedroom')">➕ Add Bedroom</button>
+  <button onclick="addRoom('Dining Area')">➕ Add Dining Area</button>
+  <label><input type="checkbox" id="penModeToggle" /> ✍️ Enable Pen Drawing</label>
+  <label><input type="checkbox" id="straightLineToggle" /> 📏 Straight Line Mode</label>
+  <button onclick="clearLast()">🧹 Clear Last</button>
+  <button onclick="clearAll()">🧼 Clear All</button>
+  <input type="text" id="dataName" placeholder="Label (e.g. AC Unit), Value (e.g. 5.2)" />
+  <input type="number" id="dataValue" placeholder="Value (e.g. 5.2)" />
+  <input type="number" id="dataValue1" placeholder="Value (e.g. 5.2)" />
+  <button onclick="insertData()">📌 Insert Data</button>
+
+</div>
+
+<script>
+  const canvas = document.getElementById("floorCanvas");
+  const ctx = canvas.getContext("2d");
+  let rooms = [];
+  let drawings = [];
+  let history = [];
+  let draggingRoom = null;
+  let offsetX = 0, offsetY = 0;
+  const gridSize = 20;
+  let isDrawing = false;
+  let currentPath = [];
+  let straightLineMode = false;
+  let startPoint = null;
+
+  function addRoom(name) {
+    const room = {
+      name,
+      x: 100 + rooms.length * 50,
+      y: 100 + rooms.length * 30,
+      width: 120,
+      height: 80,
+      id: Date.now()
+    };
+    rooms.push(room);
+    history.push({ type: "room", ref: room });
+    drawCanvas();
+    addLabel(room);
+  }
+
+  function drawCanvas() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rooms.forEach(room => {
+      ctx.fillStyle = "#e0f7fa";
+      ctx.fillRect(room.x, room.y, room.width, room.height);
+      ctx.strokeStyle = "#0077cc";
+      ctx.strokeRect(room.x, room.y, room.width, room.height);
+    });
+    drawings.forEach(path => {
+      ctx.beginPath();
+      for (let i = 0; i < path.length - 1; i++) {
+        ctx.moveTo(path[i].x, path[i].y);
+        ctx.lineTo(path[i + 1].x, path[i + 1].y);
+      }
+      ctx.strokeStyle = "#ff5722";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    });
+    dataPoints.forEach(dp => {
+      ctx.fillStyle = "#4caf50";
+      ctx.font = "14px Arial";
+      ctx.fillText(`${dp.name}: ${dp.value}`, dp.x, dp.y);
+  });
+    
+  }
+
+  function addLabel(room) {
+    const label = document.createElement("div");
+    label.className = "label";
+    label.style.left = `${canvas.offsetLeft + room.x + 5}px`;
+    label.style.top = `${canvas.offsetTop + room.y + 5}px`;
+    label.textContent = room.name;
+    label.onclick = () => editRoom(room, label);
+    document.body.appendChild(label);
+    room.labelElement = label;
+  }
+
+  function editRoom(room, labelEl) {
+    const newName = prompt("Enter room name:", room.name);
+    if (newName !== null) room.name = newName;
+    const width = prompt("Enter width (m):", (room.width / 10).toFixed(2));
+    const height = prompt("Enter height (m):", (room.height / 10).toFixed(2));
+    room.width = parseFloat(width) * 10;
+    room.height = parseFloat(height) * 10;
+    labelEl.textContent = `${room.name} (${width}m x ${height}m)`;
+    drawCanvas();
+    updateLabelPosition(room);
+  }
+
+  function updateLabelPosition(room) {
+    if (room.labelElement) {
+      room.labelElement.style.left = `${canvas.offsetLeft + room.x + 5}px`;
+      room.labelElement.style.top = `${canvas.offsetTop + room.y + 5}px`;
+    }
+  }
+
+  canvas.addEventListener("mousedown", (e) => {
+    const penMode = document.getElementById("penModeToggle").checked;
+    straightLineMode = document.getElementById("straightLineToggle").checked;
+
+    if (penMode) {
+      if (straightLineMode) {
+        startPoint = { x: e.offsetX, y: e.offsetY };
+      } else {
+        isDrawing = true;
+        currentPath = [{ x: e.offsetX, y: e.offsetY }];
+      }
+      return;
+    }
+
+    const x = e.offsetX;
+    const y = e.offsetY;
+    draggingRoom = rooms.find(r =>
+      x >= r.x && x <= r.x + r.width &&
+      y >= r.y && y <= r.y + r.height
+    );
+    if (draggingRoom) {
+      offsetX = x - draggingRoom.x;
+      offsetY = y - draggingRoom.y;
+    }
+  });
+
+  canvas.addEventListener("mousemove", (e) => {
+    const penMode = document.getElementById("penModeToggle").checked;
+    if (penMode && isDrawing) {
+      currentPath.push({ x: e.offsetX, y: e.offsetY });
+      drawCanvas();
+      ctx.beginPath();
+      for (let i = 0; i < currentPath.length - 1; i++) {
+        ctx.moveTo(currentPath[i].x, currentPath[i].y);
+        ctx.lineTo(currentPath[i + 1].x, currentPath[i + 1].y);
+      }
+      ctx.strokeStyle = "#ff5722";
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      return;
+    }
+    if (!draggingRoom) return;
+    let newX = e.offsetX - offsetX;
+    let newY = e.offsetY - offsetY;
+    newX = Math.round(newX / gridSize) * gridSize;
+    newY = Math.round(newY / gridSize) * gridSize;
+    draggingRoom.x = newX;
+    draggingRoom.y = newY;
+    drawCanvas();
+    updateLabelPosition(draggingRoom);
+  });
+
+  canvas.addEventListener("mouseup", (e) => {
+    const penMode = document.getElementById("penModeToggle").checked;
+    if (penMode) {
+      if (straightLineMode && startPoint) {
+        const endPoint = { x: e.offsetX, y: e.offsetY };
+        const line = [startPoint, endPoint];
+        drawings.push(line);
+        history.push({ type: "drawing", ref: line });
+        drawCanvas();
+        startPoint = null;
+      } else if (isDrawing) {
+        drawings.push(currentPath);
+        history.push({ type: "drawing", ref: currentPath });
+        isDrawing = false;
+      }
+      return;
+    }
+    draggingRoom = null;
+    
+  });
+
+  canvas.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  const x = e.offsetX;
+  const y = e.offsetY;
+  const room = rooms.find(r =>
+    x >= r.x && x <= r.x + r.width &&
+    y >= r.y && y <= r.y + r.height
+  );
+  if (room) {
+    const action = prompt("Type 'w' to change width, 'h' to change height, or 'b' for both:");
+    if (action === "w") {
+      const newWidth = prompt("Enter new width (m):", (room.width / 10).toFixed(2));
+      if (!isNaN(newWidth)) room.width = parseFloat(newWidth) * 10;
+    } else if (action === "h") {
+      const newHeight = prompt("Enter new height (m):", (room.height / 10).toFixed(2));
+      if (!isNaN(newHeight)) room.height = parseFloat(newHeight) * 10;
+    } else if (action === "b") {
+      const newWidth = prompt("Enter new width (m):", (room.width / 10).toFixed(2));
+      const newHeight = prompt("Enter new height (m):", (room.height / 10).toFixed(2));
+      if (!isNaN(newWidth)) room.width = parseFloat(newWidth) * 10;
+      if (!isNaN(newHeight)) room.height = parseFloat(newHeight) * 10;
+    }
+    drawCanvas();
+    updateLabelPosition(room);
+    room.labelElement.textContent = `${room.name} (${(room.width / 10).toFixed(2)}m x ${(room.height / 10).toFixed(2)}m)`;
+  }
+});
+
+  function clearLast() {
+    if (history.length === 0) return;
+    const last = history.pop();
+    if (last.type === "room") {
+      rooms = rooms.filter(r => r !== last.ref);
+      last.ref.labelElement?.remove();
+    } else if (last.type === "drawing") {
+      drawings = drawings.filter(d => d !== last.ref);
+    }
+    drawCanvas();
+  }
+
+  function clearAll() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    rooms.forEach(r => r.labelElement?.remove());
+    rooms = [];
+    drawings = [];
+    history = [];
+  }
+  let dataPoints = [];
+
+function insertData() {
+  const name = document.getElementById("dataName").value.trim();
+  const value = document.getElementById("dataValue").value.trim();
+  const value1 = document.getElementById("dataValue1").value.trim();
+
+  if (!name || !value || !value1) {
+    alert("Please enter all fields.");
+    return;
+  }
+
+  const point = {
+    name: name,
+    value: value,
+    value1: value1,
+    x: 50 + dataPoints.length * 100,
+    y: canvas.height - 40
+  };
+
+  dataPoints.push(point);
+  history.push({ type: "data", ref: point });
+  drawCanvas();
+}
+</script>
+
+</body>
+</html>
